@@ -1,0 +1,107 @@
+-------------
+Day before
+-------------
+If applicable: Create inputs for nifi using creditcardfraud.zip and create_nifi_iputs.py (requires things like pandas and spark to be installed)
+Set local dir and start python3:
+cd /Users/djaheruddin/Documents/Customer/ING/DemoRisk
+python3
+
+
+Access hdp master 
+ssh cloudbreak@3.9.128.97 -i /Users/djaheruddin/Documents/whoville/field.pem
+mkdir /tmp/demo
+mkdir /tmp/demo/input
+mkdir /tmp/demo/output
+hadoop fs -mkdir /tmp/demo
+hadoop fs -mkdir /tmp/demo/input
+
+Upload data file (from local terminal), about 15 min total (I used 3 terminal windows)
+scp -i /Users/djaheruddin/Documents/whoville/field.pem  /Users/djaheruddin/Documents/Customer/ING/DemoRisk/day1.csv cloudbreak@3.9.128.97:/tmp/demo/input
+scp -i /Users/djaheruddin/Documents/whoville/field.pem  /Users/djaheruddin/Documents/Customer/ING/DemoRisk/day2.csv cloudbreak@3.9.128.97:/tmp/demo/input
+scp -i /Users/djaheruddin/Documents/whoville/field.pem  /Users/djaheruddin/Documents/Customer/ING/DemoRisk/day3.csv cloudbreak@3.9.128.97:/tmp/demo/input
+
+Put data on HDFS (from node where we just uploaded it): 
+hadoop fs -mkdir /tmp/demo
+hadoop fs -mkdir /tmp/demo/input
+hadoop fs -put /tmp/demo/input/* /tmp/demo/input
+hadoop fs -chmod -R 777 /tmp/demo
+
+Access Ambari:
+https://3.9.128.97:8443/dj-hdp31-edge2ai-m/dp-proxy/ambari/#/main/dashboard/metrics
+Or go directly to NiFi:
+http://3.8.96.201:9090/nifi/
+Delete any flows that may exist
+
+
+Import template 
+Risk_data_flow.xml
+- Update IP addresses everywhere (at least: Analyze new transaction>Analyze with advanced model, and in the generateflowfile we also need to update the message content)
+- TODO: Connect to CDSW
+
+
+CDSW: Prep notes not in this file, but make sure the model is accessible. from NiFi.
+
+Access cdsw master:
+3.8.99.229.xip.io
+
+CDSW user: cloudbreak
+pass:cloudbreak
+
+CDSW admin: whoville
+pass: whoville-password
+
+We choose 1/4 for the model
+
+
+------
+20 minutes before
+------
+
+1. Open firewall to Philippe and Dennis
+
+2. Open NiFi screen:
+http://3.8.96.201:9090/nifi/?processGroupId=643ca5f0-da67-349b-826c-99c990b4b3d0&componentIds=623c9b9c-016c-1000-0000-00000d8b00d4
+
+3. Put data on HDFS (from node where we just uploaded it):
+ssh cloudbreak@3.9.128.97 -i /Users/djaheruddin/Documents/whoville/field.pem
+hadoop fs -put /tmp/demo/input/* /tmp/demo/input ;hadoop fs -touch /tmp/demo/input/otherlog.txt;hadoop fs -chmod -R 777 /tmp/demo
+
+4. Make sure the putfile called 'store raw data' that I add during the presentation is not already there
+
+5. Make sure flows are stopped, queues are empty, open risk data screen
+
+-----
+During the presentation
+-----
+
+### Calling realtime model
+
+Lets start with the dreamstate
+One way to use models, is by evaluating transactions in realtime
+Here we see messages coming in (start first processor)
+In this case I set it to about 1/sec but nifi can also scale to 100k/sec
+Now the cool part, I am actually going to send the data to a model made by Philippe, and directly afterwards I get the evaluation
+Based on this evaluation I will either let it be processed, or send it to a different applicaion or even a person for advanced checking
+Lets take a moment to look at some features:
+- VISUAL INTERFACE> Very intuitive, easy to work with. Not only guarantees standardization, but also allows you to see in one glance what is going on
+- Provenance> check out the last queue. We can actually see what the message is right now
+
+### Moving data files
+Hopefully that was pretty cool, now lets see what it takes to get there
+It starts with moving the data needed to train your model
+Here is the flow I used to do that
+Whe get data from a source, in this case a filesystem, but it could be pretty much anything
+As you can see we have pulled in four files
+Just as an example of processing, I am going to filter out only the relevant logs
+You can see we now have 3 files left, one for each day
+In this case I am starting nifi as we go throug it, but once you set up your pipeline, it can automatically pick up new files
+After we have selected the right files, I just need to put them somewhere, in this case a datalake
+
+Now we are pretty much done with the first step, to recap: Nifi is very intuitive for moving data, in fact: let me update the flow (add putfile processor, set /tmp/sfasdf, self terminate, add connection)
+
+So, with just a few clicks, and without interrupting ongoing operations, we were able to update the flow and make sure we capture all raw data.
+
+Now, let's see what we do with the data we just moved, Philippe!
+
+
+
